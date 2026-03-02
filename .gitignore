@@ -1,15 +1,13 @@
 # Python
-.venv/
-__pycache__/
+ml_service/.venv/
+**/__pycache__/
 *.pyc
 
 # Node
 node_modules/
 
-# Temp / runtime
-tmp/
+# Runtime folders
 uploads/
-
-# OS
-.DS_Store
-Thumbs.db
+ml_service/tmp/
+ml_service/outputs/heatmaps/
+ml_service/outputs/masks/
