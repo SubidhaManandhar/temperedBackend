@@ -21,8 +21,10 @@ os.makedirs(os.path.join(OUTPUTS_DIR, "masks"), exist_ok=True)
 app.mount("/static", StaticFiles(directory=OUTPUTS_DIR), name="static")
 
 # ✅ CHANGE THESE TWO FILENAMES to match what you downloaded from GitHub outputs/models
-STAGEA_MODEL_PATH = os.path.join(MODELS_DIR, "best_stageA_binary.keras")
-STAGEB_MODEL_PATH = os.path.join(MODELS_DIR, "final_stageB_tamper4.keras")
+
+
+STAGEA_MODEL_PATH = os.path.join(MODELS_DIR, "best_stageA_binary.h5")
+STAGEB_MODEL_PATH = os.path.join(MODELS_DIR, "final_stageB_tamper4.h5")
 
 stageA = tf.keras.models.load_model(STAGEA_MODEL_PATH)
 stageB = tf.keras.models.load_model(STAGEB_MODEL_PATH)
@@ -65,3 +67,7 @@ async def predict(image: UploadFile = File(...)):
         "bbox": result["bbox"],
         "best_layer": result["best_layer"]
     }
+
+@app.get("/")
+def root():
+    return {"message": "ML service running. Use /docs, /health, /predict"}

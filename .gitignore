@@ -1,14 +1,15 @@
-# Node
-node_modules/
-
-# Env files
-.env
-
 # Python
 .venv/
 __pycache__/
 *.pyc
 
-# ML outputs (optional, but recommended)
-ml_service/outputs/
-ml_service/models/
+# Node
+node_modules/
+
+# Temp / runtime
+tmp/
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
