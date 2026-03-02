@@ -11,3 +11,6 @@ uploads/
 ml_service/tmp/
 ml_service/outputs/heatmaps/
 ml_service/outputs/masks/
+
+ml_service/.venv/
+node_modules/
