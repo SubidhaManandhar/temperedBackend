@@ -14,3 +14,13 @@ ml_service/outputs/masks/
 
 ml_service/.venv/
 node_modules/
+
+node_modules
+.vscode
+.env
+ml_service/.venv
+ml_service/tmp
+uploads
+ml_service/outputs
+__pycache__
+*.pyc

@@ -1,39 +1,37 @@
 const fs = require("fs");
 const FormData = require("form-data");
-const client = require("../utils/httpClient.js");
+const axios = require("axios");
 
-async function predictImage(req, res, next) {
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
+
+const predictImage = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "Image file is required." });
-    }
-
-    const mlUrl = process.env.ML_SERVICE_URL;
-
-    // If Python service is OFF, return dummy response
-    if (!mlUrl) {
-      return res.json({
-        filename: req.file.filename,
-        label: "unknown",
-        confidence: 0,
-        note: "ML_SERVICE_URL not set",
-      });
+      return res.status(400).json({ error: "No image uploaded." });
     }
 
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
-    const mlRes = await client.post(`${mlUrl}/predict`, form, {
+    const response = await axios.post(`${ML_SERVICE_URL}/predict`, form, {
       headers: form.getHeaders(),
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
     });
 
     return res.json({
       filename: req.file.filename,
-      ...mlRes.data,
+      ...response.data,
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    const message =
+      error?.response?.data?.detail ||
+      error?.response?.data?.error ||
+      error.message ||
+      "Prediction failed";
+
+    return res.status(500).json({ error: message });
   }
-}
+};
 
 module.exports = { predictImage };

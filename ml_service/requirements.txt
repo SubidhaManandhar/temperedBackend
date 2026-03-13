@@ -4,4 +4,6 @@ python-multipart
 numpy
 pillow
 opencv-python
-tensorflow
+torch
+torchvision
+
