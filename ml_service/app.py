@@ -4,7 +4,7 @@ import torch
 from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 
-from models.model_def import build_resnet50_7ch
+from models.model_def import build_resnet50_9ch
 from inference.predict_pytorch import predict_image
 
 app = FastAPI()
@@ -15,18 +15,15 @@ OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
 
 os.makedirs(TMP_DIR, exist_ok=True)
-os.makedirs(os.path.join(OUTPUTS_DIR, "originals"), exist_ok=True)
-os.makedirs(os.path.join(OUTPUTS_DIR, "ela"), exist_ok=True)
-os.makedirs(os.path.join(OUTPUTS_DIR, "noise"), exist_ok=True)
-os.makedirs(os.path.join(OUTPUTS_DIR, "heatmaps"), exist_ok=True)
-os.makedirs(os.path.join(OUTPUTS_DIR, "masks"), exist_ok=True)
+for folder in ["originals", "ela", "noise", "heatmaps", "masks"]:
+    os.makedirs(os.path.join(OUTPUTS_DIR, folder), exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=OUTPUTS_DIR), name="static")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = os.path.join(MODELS_DIR, "best_model.pth")
 
-model = build_resnet50_7ch(num_classes=5, pretrained=False)
+model = build_resnet50_9ch(num_classes=5, pretrained=False)
 state = torch.load(MODEL_PATH, map_location=DEVICE)
 model.load_state_dict(state, strict=True)
 model.to(DEVICE)

@@ -6,6 +6,7 @@ import cv2
 import torch
 import torch.nn.functional as F
 from PIL import Image, ImageChops
+from torchvision import transforms
 
 IMG_SIZE = (224, 224)
 
@@ -20,6 +21,11 @@ CLASS_NAMES = [
 ELA_QUALITIES = (70, 85, 95)
 MIN_COMPONENT_AREA = 80
 OVERLAY_ALPHA = 0.55
+
+NORMALIZE_9 = transforms.Normalize(
+    mean=[0.485, 0.456, 0.406, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    std=[0.229, 0.224, 0.225, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+)
 
 
 def _ela_single(img_rgb: Image.Image, quality: int) -> np.ndarray:
@@ -42,30 +48,36 @@ def compute_ela_multiscale(img: Image.Image) -> Image.Image:
     return Image.fromarray(avg)
 
 
-def compute_noise_map(img: Image.Image) -> Image.Image:
-    gray = np.array(img.convert("L"), dtype=np.float32) / 255.0
-    blurred = cv2.GaussianBlur(gray, (5, 5), sigmaX=1.5)
-    noise = gray - blurred
-    p2, p98 = np.percentile(noise, [2, 98])
-    denom = max(p98 - p2, 1e-6)
-    norm = np.clip((noise - p2) / denom, 0.0, 1.0)
-    return Image.fromarray((norm * 255).astype(np.uint8), mode="L")
+def compute_noise_map_rgb(img: Image.Image) -> Image.Image:
+    rgb = np.array(img.convert("RGB"), dtype=np.float32) / 255.0
+    blurred = cv2.GaussianBlur(rgb, (5, 5), sigmaX=1.5)
+    noise = rgb - blurred
+
+    out = np.zeros_like(noise)
+    for c in range(3):
+        p2, p98 = np.percentile(noise[..., c], [2, 98])
+        denom = max(p98 - p2, 1e-6)
+        out[..., c] = np.clip((noise[..., c] - p2) / denom, 0.0, 1.0)
+
+    return Image.fromarray((out * 255).astype(np.uint8), mode="RGB")
 
 
-def preprocess_7ch(image_path: str):
+def preprocess_9ch(image_path: str):
     img = Image.open(image_path).convert("RGB").resize(IMG_SIZE)
     ela = compute_ela_multiscale(img).resize(IMG_SIZE)
-    noise = compute_noise_map(img).resize(IMG_SIZE)
+    noise = compute_noise_map_rgb(img).resize(IMG_SIZE)
 
     rgb_np = np.asarray(img, dtype=np.float32) / 255.0
     ela_np = np.asarray(ela, dtype=np.float32) / 255.0
     noise_np = np.asarray(noise, dtype=np.float32) / 255.0
 
-    rgb_t = torch.from_numpy(rgb_np).permute(2, 0, 1)
-    ela_t = torch.from_numpy(ela_np).permute(2, 0, 1)
-    noise_t = torch.from_numpy(noise_np).unsqueeze(0)
+    rgb_t = torch.from_numpy(rgb_np).permute(2, 0, 1)      # 3,H,W
+    ela_t = torch.from_numpy(ela_np).permute(2, 0, 1)      # 3,H,W
+    noise_t = torch.from_numpy(noise_np).permute(2, 0, 1)  # 3,H,W
 
-    x = torch.cat([rgb_t, ela_t, noise_t], dim=0).unsqueeze(0).float()
+    x = torch.cat([rgb_t, ela_t, noise_t], dim=0)          # 9,H,W
+    x = NORMALIZE_9(x).unsqueeze(0).float()                # 1,9,H,W
+
     return img, ela, noise, x
 
 
@@ -168,13 +180,8 @@ def save_rgb(path, pil_img):
     cv2.imwrite(path, cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR))
 
 
-def save_gray(path, pil_img):
-    np_img = np.array(pil_img)
-    cv2.imwrite(path, np_img)
-
-
 def predict_image(image_path: str, model, device, outputs_dir: str):
-    original, ela_img, noise_img, x = preprocess_7ch(image_path)
+    original, ela_img, noise_img, x = preprocess_9ch(image_path)
 
     originals_dir = os.path.join(outputs_dir, "originals")
     ela_dir = os.path.join(outputs_dir, "ela")
@@ -196,7 +203,7 @@ def predict_image(image_path: str, model, device, outputs_dir: str):
 
     save_rgb(os.path.join(originals_dir, original_file), original)
     save_rgb(os.path.join(ela_dir, ela_file), ela_img)
-    save_gray(os.path.join(noise_dir, noise_file), noise_img)
+    save_rgb(os.path.join(noise_dir, noise_file), noise_img)
 
     logits, probs = predict_logits(model, x, device)
     probs_np = probs.squeeze(0).cpu().numpy()
@@ -244,7 +251,10 @@ def predict_image(image_path: str, model, device, outputs_dir: str):
     heatmap_file = f"{file_id}.png"
     mask_file = f"{file_id}.png"
 
-    cv2.imwrite(os.path.join(heatmaps_dir, heatmap_file), cv2.cvtColor(np.array(overlay), cv2.COLOR_RGB2BGR))
+    cv2.imwrite(
+        os.path.join(heatmaps_dir, heatmap_file),
+        cv2.cvtColor(np.array(overlay), cv2.COLOR_RGB2BGR),
+    )
     cv2.imwrite(os.path.join(masks_dir, mask_file), mask)
 
     return {
